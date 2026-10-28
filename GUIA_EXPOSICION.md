@@ -28,12 +28,12 @@ Si te pierdes durante la exposición, vuelve a esta frase.
 | 7 | Asistencia | Con menos del 75 % de asistencia abandona el 70 %; con más del 95 %, solo el 3 %. **×26**. |
 | 8 | Variables | Usamos 24 variables. **No usamos** sexo, origen ni territorio: no deben decidir quién recibe ayuda. |
 | 9 | Transformaciones | Convertimos el texto en números y pusimos todas las variables en la misma escala. |
-| 10 | Modelo | Regresión logística: da una probabilidad y explica qué pesa. Con *balanced* detectamos muchos más abandonos (de 55 % a 87 %). |
-| 11 | Umbral | El umbral decide a partir de qué probabilidad damos la alerta. Lo elegimos para detectar al menos el 85 %. |
+| 10 | Modelo | Regresión logística: da una probabilidad y explica qué pesa. Con *balanced* le pedimos al modelo que preste más atención a los que abandonan, que son pocos. |
+| 11 | Umbral | El umbral decide a partir de qué probabilidad damos la alerta. Usamos el estándar, 50 %: bajarlo detecta más abandonos, pero genera más falsas alarmas. |
 | 12 | Resultados | Con estudiantes que el modelo **no había visto**: detecta el 80 % de los abandonos. |
 | 13 | Matriz | 55 detectados, 14 que se escapan, 47 falsas alarmas. Una falsa alarma cuesta una tutoría; un abandono cuesta un futuro. |
 | 14 | Coeficientes | Suben el riesgo: repetir curso, acoso, problemas económicos, suspensos. Protegen: asistencia, motivación, buena relación con el profesorado. |
-| 15 | Equidad | El modelo falla más con chicos que con chicas. Lo decimos con honestidad: habría que investigarlo. |
+| 15 | Equidad | Es una limitación: no hemos medido si el modelo detecta igual de bien a todos los grupos. Es el siguiente paso. |
 | 16 | Recomendaciones | Cada señal de riesgo tiene una acción concreta. |
 | 17 | Demo | Ver el apartado 4 de esta guía. |
 | 18 | Conclusiones | Tres ideas: detecta 8 de cada 10 · la asistencia es la clave · siempre con revisión humana. |
@@ -50,7 +50,7 @@ Si te pierdes durante la exposición, vuelve a esta frase.
 | **Regresión logística** | Una «balanza»: cada dato del estudiante empuja hacia abandonar o hacia continuar, y el resultado es una probabilidad de 0 a 100 %. |
 | **Variable** | Cada dato del estudiante: asistencia, nota, edad… |
 | **Variable objetivo** | Lo que queremos predecir: si abandona (1) o no (0). |
-| **Entrenamiento / validación / prueba** | Como estudiar con apuntes (entrenamiento), hacer un simulacro (validación) y presentarse al examen final (prueba). El examen tiene preguntas que el modelo no ha visto nunca. |
+| **Entrenamiento / prueba** | Como estudiar con apuntes (entrenamiento) y presentarse al examen final (prueba), con preguntas que el modelo no ha visto nunca. La parte de validación queda reservada. |
 | **Desbalance** | Hay muchos más casos de una clase (continúa) que de la otra (abandona). |
 | **class_weight="balanced"** | Le decimos al modelo: «presta más atención a los que abandonan, que son pocos». |
 | **One-hot encoding** | Convertir una categoría de texto (por ejemplo, «Bachillerato») en columnas de 0 y 1. |
@@ -58,9 +58,9 @@ Si te pierdes durante la exposición, vuelve a esta frase.
 | **Pipeline** | Una cadena de pasos que se aplican siempre en el mismo orden: preparar los datos y luego el modelo. |
 | **Umbral** | El «listón»: si la probabilidad lo supera, damos la alerta. |
 | **Recall** | De los que abandonan de verdad, ¿a cuántos encontramos? (**80 %**) |
-| **Precision** | De los que marcamos en riesgo, ¿cuántos abandonan de verdad? (**54 %**) |
-| **Accuracy** | Aciertos totales (**83 %**). Engaña si las clases están desbalanceadas. |
-| **F1-score** | Una nota que combina recall y precision (**0,64**). |
+| **Precision** | De los que marcamos en riesgo, ¿cuántos abandonan de verdad? (**55 %**) |
+| **Accuracy** | Aciertos totales (**84 %**). Engaña si las clases están desbalanceadas. |
+| **F1-score** | Una nota que combina recall y precision (**0,65**). |
 | **AUC-ROC** | Lo bien que el modelo ordena de más a menos riesgo. 1 = perfecto, 0,5 = lanzar una moneda (**0,91**). |
 | **Falso negativo** | Abandona y no lo detectamos. **El error más grave.** |
 | **Falso positivo** | Damos una alerta y no iba a abandonar. Cuesta una tutoría de más. |
@@ -99,25 +99,25 @@ tiene que justificar a quién ofrece ayuda, eso es más importante que ganar un 
 Porque solo el 19 % abandona. Un modelo que dijera siempre «continúa» tendría un 81 % de accuracy sin
 detectar a nadie. Lo que importa es **no dejar escapar** a quien va a abandonar.
 
-**¿Por qué el recall en prueba (80 %) no llega al 85 % que buscabais?**
-El umbral se eligió con el conjunto de validación, donde sí llegaba al 87 %. En prueba solo hay 69
-abandonos, y con tan pocos casos un par de estudiantes cambian mucho el porcentaje. Si EduFuture quisiera
-detectar más, bastaría con bajar el umbral a 0,45.
+**¿Por qué el recall es un 80 % y no más?**
+Hay un equilibrio: si bajamos el umbral detectamos más abandonos, pero hay que revisar a más estudiantes.
+Con un umbral de 0,35 detectaríamos el 90 %, pero habría que revisar a 126 estudiantes de 360 en lugar de 100.
+Para empezar usamos el estándar del 50 %.
 
 **¿Qué hicisteis con los valores nulos y los outliers?**
 No había nulos. Los outliers los detectamos con la regla IQR y los **mantuvimos**: son pocos (menos del 3 %),
 son valores posibles y suelen ser los estudiantes con más riesgo.
 
 **¿Por qué no usáis el sexo o el origen si pueden influir?**
-Porque son datos sensibles y no deben decidir quién recibe ayuda. Los usamos solo para **auditar** que el
-modelo no falla más con un grupo que con otro.
+Porque son datos sensibles y no deben decidir quién recibe ayuda. El siguiente paso sería usarlos solo para
+**auditar** que el modelo no falla más con un grupo que con otro.
 
 **¿Hay sobreajuste?**
-No. El AUC es casi igual en entrenamiento (0,91), validación (0,92) y prueba (0,91).
+No. El AUC es casi igual en entrenamiento (0,91) y en prueba (0,91).
 
 **¿Se podría usar en un centro real?**
 Los datos son **sintéticos**, así que haría falta entrenarlo con datos reales. Además habría que estudiar
-la diferencia entre chicos y chicas y mantener siempre la revisión humana.
+la equidad entre grupos de estudiantes y mantener siempre la revisión humana.
 
 ---
 

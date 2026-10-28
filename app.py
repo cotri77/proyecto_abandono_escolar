@@ -3,21 +3,18 @@
 #
 # Ejecutar en local:   streamlit run app.py
 #
-# La app cuenta el proyecto como una historia en 5 pasos (una pestaña por paso):
+# La app cuenta el proyecto en 5 pasos (una pestaña por paso):
 #   1. El reto  ->  2. Qué dicen los datos  ->  3. El modelo  ->  4. ¿Acierta?  ->  5. Recomendaciones
 #
-# Reproduce las mismas decisiones que el notebook:
-#   - mismas variables y misma ingeniería de características
+# Usa EXACTAMENTE el mismo modelo que el notebook:
+#   - 19 variables numéricas + el curso (one-hot), con StandardScaler
 #   - regresión logística con class_weight="balanced"
-#   - C elegido por AUC en validación y umbral elegido con recall >= 0,85 en validación
-# El modelo se entrena al arrancar (unos segundos) y queda guardado en caché.
+#   - se entrena con la partición "entrenamiento" y se evalúa con "prueba" (umbral 50 %)
 # =============================================================================
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 import streamlit as st
 
 from sklearn.compose import ColumnTransformer
@@ -33,62 +30,40 @@ from sklearn.metrics import (accuracy_score, recall_score, precision_score, f1_s
 st.set_page_config(page_title="EduFuture · Riesgo de abandono", page_icon="🎓", layout="wide")
 
 RUTA_DATOS = Path(__file__).parent / "data" / "edufuture_dataset_abandono_escolar_sintetico.xlsx"
-RECALL_OBJETIVO = 0.85
 
-# Colores (los mismos que la presentación)
-AZUL = "#4C72B0"       # continúa
-NARANJA = "#DD8452"    # abandona / riesgo
-VERDE = "#2A9D8F"
-ROJO = "#C0392B"
-AMARILLO = "#E9C46A"
-TINTA = "#1B2A41"
-GRIS = "#8D99AE"
+# Colores (los mismos que el notebook y la presentación)
+AZUL, NARANJA, VERDE, ROJO, AMARILLO, TINTA, GRIS = (
+    "#4C72B0", "#DD8452", "#2A9D8F", "#C0392B", "#E9C46A", "#1B2A41", "#8D99AE")
 
-# Estilo común de los gráficos: fondo blanco, letra pequeña y sin bordes innecesarios
-sns.set_theme(style="whitegrid")
+# Estilo común de los gráficos: letra pequeña y sin bordes innecesarios
 plt.rcParams.update({"font.size": 10, "axes.titlesize": 12, "axes.titleweight": "bold",
                      "axes.spines.top": False, "axes.spines.right": False})
 
 OBJETIVO = "abandono_en_12_meses"
-VARIABLES_CATEGORICAS = ["etapa", "entorno_municipio", "max_estudios_progenitores"]
 VARIABLES_NUMERICAS = [
-    "asistencia_ultimos_30_dias_pct", "retrasos_ultimos_30_dias",
-    "materias_suspensas_trimestre_anterior", "nota_media_trimestre_anterior_0_10",
-    "ha_repetido_curso", "horas_estudio_semana",
-    "edad_anios", "segundo_curso", "dificultad_economica_hogar_1_5",
-    "internet_estable_hogar", "espacio_adecuado_estudio",
+    "asistencia_ultimos_30_dias_pct", "retrasos_ultimos_30_dias", "materias_suspensas_trimestre_anterior",
+    "nota_media_trimestre_anterior_0_10", "ha_repetido_curso", "horas_estudio_semana", "edad_anios",
+    "dificultad_economica_hogar_1_5", "internet_estable_hogar", "espacio_adecuado_estudio",
     "horas_trabajo_remunerado_semana", "horas_cuidados_familiares_semana",
-    "satisfaccion_programa_1_5", "utilidad_percibida_estudios_1_5",
-    "pertenencia_centro_1_5", "relacion_docentes_1_5", "acoso_frecuencia_0_3",
-    "bienestar_autopercibido_1_5", "apoyo_familiar_estudios_1_5",
-    "intencion_continuar_estudios_1_5",
+    "satisfaccion_programa_1_5", "utilidad_percibida_estudios_1_5", "pertenencia_centro_1_5",
+    "relacion_docentes_1_5", "apoyo_familiar_estudios_1_5", "intencion_continuar_estudios_1_5",
+    "acoso_0_3",
 ]
+VARIABLES_CATEGORICAS = ["curso_nivel"]    # el curso ya incluye la etapa
 PREDICTORAS = VARIABLES_NUMERICAS + VARIABLES_CATEGORICAS
 ORDEN_ACOSO = {"Nunca": 0, "Una vez": 1, "Varias veces al mes": 2, "Una vez por semana o más": 3}
 
 # Nombres legibles para mostrar en pantalla
 NOMBRES = {
-    "asistencia_ultimos_30_dias_pct": "Asistencia (%)",
-    "retrasos_ultimos_30_dias": "Retrasos (30 días)",
-    "materias_suspensas_trimestre_anterior": "Materias suspensas",
-    "nota_media_trimestre_anterior_0_10": "Nota media",
-    "ha_repetido_curso": "Ha repetido curso",
-    "horas_estudio_semana": "Horas de estudio/semana",
-    "edad_anios": "Edad",
-    "segundo_curso": "Está en 2º curso",
-    "dificultad_economica_hogar_1_5": "Dificultad económica",
-    "internet_estable_hogar": "Internet estable",
-    "espacio_adecuado_estudio": "Espacio de estudio",
-    "horas_trabajo_remunerado_semana": "Horas de trabajo/semana",
-    "horas_cuidados_familiares_semana": "Horas de cuidados/semana",
-    "satisfaccion_programa_1_5": "Satisfacción con el programa",
-    "utilidad_percibida_estudios_1_5": "Utilidad percibida",
-    "pertenencia_centro_1_5": "Pertenencia al centro",
-    "relacion_docentes_1_5": "Relación con docentes",
-    "acoso_frecuencia_0_3": "Frecuencia de acoso",
-    "bienestar_autopercibido_1_5": "Bienestar",
-    "apoyo_familiar_estudios_1_5": "Apoyo familiar",
-    "intencion_continuar_estudios_1_5": "Intención de continuar",
+    "asistencia_ultimos_30_dias_pct": "Asistencia", "retrasos_ultimos_30_dias": "Retrasos",
+    "materias_suspensas_trimestre_anterior": "Materias suspensas", "nota_media_trimestre_anterior_0_10": "Nota media",
+    "ha_repetido_curso": "Ha repetido curso", "horas_estudio_semana": "Horas de estudio", "edad_anios": "Edad",
+    "dificultad_economica_hogar_1_5": "Dificultad económica", "internet_estable_hogar": "Internet estable",
+    "espacio_adecuado_estudio": "Espacio de estudio", "horas_trabajo_remunerado_semana": "Horas de trabajo",
+    "horas_cuidados_familiares_semana": "Horas de cuidados", "satisfaccion_programa_1_5": "Satisfacción con el programa",
+    "utilidad_percibida_estudios_1_5": "Utilidad percibida", "pertenencia_centro_1_5": "Pertenencia al centro",
+    "relacion_docentes_1_5": "Relación con docentes", "apoyo_familiar_estudios_1_5": "Apoyo familiar",
+    "intencion_continuar_estudios_1_5": "Intención de continuar", "acoso_0_3": "Frecuencia de acoso",
 }
 
 # Glosario para la barra lateral
@@ -104,116 +79,75 @@ GLOSARIO = {
     "Falso positivo": "Alerta a un estudiante que no iba a abandonar. Cuesta una tutoría de más.",
     "Coeficiente": "Peso de cada variable en el modelo. Positivo = sube el riesgo; negativo = lo baja.",
     "class_weight='balanced'": "Le pide al modelo que dé más importancia a la clase minoritaria (los que abandonan).",
-    "Entrenamiento / validación / prueba": "El modelo aprende con el 70 %, se ajusta con el 15 % y se evalúa con el 15 % restante, que no ha visto nunca.",
+    "Entrenamiento / prueba": "El modelo aprende con el 70 % de los estudiantes y se evalúa con el 15 % que no ha visto nunca.",
 }
 
 
 # -----------------------------------------------------------------------------
-# 2. Carga y preparación de datos
+# 2. Carga de datos y modelo
 # -----------------------------------------------------------------------------
-def preparar_variables(datos):
-    """Crea las variables derivadas (igual que en el notebook)."""
-    datos = datos.copy()
-    datos["segundo_curso"] = datos["curso_nivel"].str.startswith("2").astype(int)
-    datos["acoso_frecuencia_0_3"] = datos["acoso_ultimos_30_dias"].map(ORDEN_ACOSO)
-    return datos
-
-
 @st.cache_data
 def cargar_datos(origen):
     datos = pd.read_excel(origen, sheet_name="01_Datos")
-    return preparar_variables(datos)
-
-
-# -----------------------------------------------------------------------------
-# 3. Entrenamiento del modelo
-# -----------------------------------------------------------------------------
-def crear_modelo(C):
-    preprocesado = ColumnTransformer([
-        ("num", StandardScaler(), VARIABLES_NUMERICAS),
-        ("cat", OneHotEncoder(drop="first", handle_unknown="ignore"), VARIABLES_CATEGORICAS),
-    ])
-    return Pipeline([
-        ("preprocesado", preprocesado),
-        ("regresion", LogisticRegression(C=C, class_weight="balanced", max_iter=2000, random_state=42)),
-    ])
+    datos["acoso_0_3"] = datos["acoso_ultimos_30_dias"].map(ORDEN_ACOSO)   # texto -> número 0 a 3
+    return datos
 
 
 def calcular_metricas(y_real, probabilidades, umbral):
     prediccion = (probabilidades >= umbral).astype(int)
     return {
-        "accuracy": accuracy_score(y_real, prediccion),
-        "recall": recall_score(y_real, prediccion),
-        "precision": precision_score(y_real, prediccion, zero_division=0),
-        "f1": f1_score(y_real, prediccion),
-        "auc_roc": roc_auc_score(y_real, probabilidades),
-        "matriz": confusion_matrix(y_real, prediccion),
+        "accuracy": accuracy_score(y_real, prediccion), "recall": recall_score(y_real, prediccion),
+        "precision": precision_score(y_real, prediccion, zero_division=0), "f1": f1_score(y_real, prediccion),
+        "auc_roc": roc_auc_score(y_real, probabilidades), "matriz": confusion_matrix(y_real, prediccion),
     }
 
 
 @st.cache_resource
 def entrenar(datos):
-    """Entrena con 'entrenamiento', ajusta C y umbral con 'validacion' y evalúa en 'prueba'."""
+    """Entrena con 'entrenamiento' y evalúa con 'prueba' (igual que el notebook)."""
     train = datos[datos["particion_sugerida"] == "entrenamiento"]
-    val = datos[datos["particion_sugerida"] == "validacion"]
     test = datos[datos["particion_sugerida"] == "prueba"]
 
-    # Elegimos C por AUC en validación
-    mejor_c, mejor_auc = None, -1
-    for C in [0.01, 0.1, 1, 10]:
-        m = crear_modelo(C).fit(train[PREDICTORAS], train[OBJETIVO])
-        auc = roc_auc_score(val[OBJETIVO], m.predict_proba(val[PREDICTORAS])[:, 1])
-        if auc > mejor_auc:
-            mejor_c, mejor_auc = C, auc
-    modelo = crear_modelo(mejor_c).fit(train[PREDICTORAS], train[OBJETIVO])
-
-    # Umbral: el más alto que mantiene recall >= 0,85 en validación
-    prob_val = modelo.predict_proba(val[PREDICTORAS])[:, 1]
-    umbral = 0.5
-    for u in np.round(np.arange(0.20, 0.81, 0.05), 2):
-        if recall_score(val[OBJETIVO], (prob_val >= u).astype(int)) >= RECALL_OBJETIVO:
-            umbral = float(u)
+    preparacion = ColumnTransformer([
+        ("numericas", StandardScaler(), VARIABLES_NUMERICAS),
+        ("categoricas", OneHotEncoder(drop="first", handle_unknown="ignore"), VARIABLES_CATEGORICAS),
+    ])
+    modelo = Pipeline([
+        ("preparacion", preparacion),
+        ("regresion", LogisticRegression(class_weight="balanced", max_iter=1000)),
+    ]).fit(train[PREDICTORAS], train[OBJETIVO])
 
     prob_test = modelo.predict_proba(test[PREDICTORAS])[:, 1]
-    metricas = calcular_metricas(test[OBJETIVO], prob_test, umbral)
 
-    # Tabla de coeficientes con nombres legibles
-    nombres = modelo.named_steps["preprocesado"].get_feature_names_out()
-    nombres = [n.replace("num__", "").replace("cat__", "") for n in nombres]
-    coef = pd.DataFrame({"variable": nombres, "coeficiente": modelo.named_steps["regresion"].coef_[0]})
-    coef["nombre"] = coef["variable"].map(NOMBRES).fillna(coef["variable"].str.replace("_", " "))
-    coef = coef.reindex(coef["coeficiente"].abs().sort_values(ascending=False).index)
+    # Coeficientes (sin los de curso, que dependen del curso de referencia)
+    nombres = [n.split("__")[1] for n in modelo.named_steps["preparacion"].get_feature_names_out()]
+    coef = pd.Series(modelo.named_steps["regresion"].coef_[0], index=nombres)
+    coef = coef[~coef.index.str.startswith("curso_nivel")]
+    coef = coef.reindex(coef.abs().sort_values(ascending=False).index)
 
-    # Auditoría de equidad (recall por grupo en prueba)
-    auditoria = test.assign(prediccion=(prob_test >= umbral).astype(int))
-    grupos = {
-        "sexo_declarado": {"Hombre": "Hombres", "Mujer": "Mujeres"},
-        "nacido_fuera_espana": {0: "Nacidos en España", 1: "Nacidos fuera"},
-        "necesidad_apoyo_educativo": {0: "Sin necesidad de apoyo", 1: "Con necesidad de apoyo"},
-        "titularidad_centro": {"Público": "Centro público", "Concertado": "Centro concertado"},
-    }
-    filas = []
-    for var, etiquetas in grupos.items():
-        for valor, etiqueta in etiquetas.items():
-            abandonos = auditoria[(auditoria[var] == valor) & (auditoria[OBJETIVO] == 1)]
-            filas.append({"grupo": etiqueta, "abandonos reales": len(abandonos),
-                          "recall": (abandonos["prediccion"] == 1).mean()})
-    equidad = pd.DataFrame(filas)
-
-    return {"modelo": modelo, "C": mejor_c, "umbral": umbral, "metricas": metricas, "coef": coef,
-            "equidad": equidad, "y_test": test[OBJETIVO].values, "prob_test": prob_test}
+    return {"metricas": calcular_metricas(test[OBJETIVO], prob_test, 0.5), "coef": coef,
+            "y_test": test[OBJETIVO].values, "prob_test": prob_test}
 
 
 # -----------------------------------------------------------------------------
-# 4. Pequeñas ayudas para la interfaz
+# 3. Pequeñas ayudas para la interfaz
 # -----------------------------------------------------------------------------
 def mensaje_clave(texto):
-    """Caja destacada con la idea principal de cada pestaña."""
     st.info(f"💡 **Mensaje clave:** {texto}")
 
 
 def figura(ancho=6, alto=3.5):
     return plt.subplots(figsize=(ancho, alto))
+
+
+def barras(ax, etiquetas, valores, titulo, color=NARANJA):
+    """Gráfico de barras sencillo con el valor encima de cada barra."""
+    ax.bar(etiquetas, valores, color=color, width=0.6)
+    for i, v in enumerate(valores):
+        ax.text(i, v + 1.5, f"{v:.0f}%", ha="center", fontweight="bold")
+    ax.set_title(titulo)
+    ax.set_ylabel("% que abandona")
+    ax.set_ylim(0, 85)
 
 
 def grafico_matriz(matriz):
@@ -226,23 +160,21 @@ def grafico_matriz(matriz):
     for fila in range(2):
         for col in range(2):
             ax.add_patch(plt.Rectangle((col, 1 - fila), 0.97, 0.97, color=colores[fila][col]))
-            color_texto = TINTA if colores[fila][col] == AMARILLO else "white"
-            ax.text(col + 0.485, 1 - fila + 0.485, textos[fila][col], ha="center", va="center",
-                    color=color_texto, fontsize=10, fontweight="bold")
+            ax.text(col + 0.485, 1 - fila + 0.485, textos[fila][col], ha="center", va="center", fontsize=10,
+                    fontweight="bold", color=TINTA if colores[fila][col] == AMARILLO else "white")
     ax.set_xlim(0, 2)
     ax.set_ylim(0, 2)
     ax.set_xticks([0.485, 1.485], ["Continúa", "Abandona"])
     ax.set_yticks([1.485, 0.485], ["Continúa", "Abandona"])
     ax.set_xlabel("Lo que predice el modelo")
     ax.set_ylabel("Lo que pasó de verdad")
-    ax.grid(False)
     for lado in ax.spines.values():
         lado.set_visible(False)
     return fig
 
 
 # -----------------------------------------------------------------------------
-# 5. Carga de datos y modelo
+# 4. Carga de datos y entrenamiento
 # -----------------------------------------------------------------------------
 if RUTA_DATOS.exists():
     df = cargar_datos(RUTA_DATOS)
@@ -254,11 +186,11 @@ else:
     df = cargar_datos(archivo)
 
 resultado = entrenar(df)
-modelo, umbral, metricas = resultado["modelo"], resultado["umbral"], resultado["metricas"]
+metricas = resultado["metricas"]
 vn, fp, fn, vp = metricas["matriz"].ravel()
 
 # -----------------------------------------------------------------------------
-# 6. Barra lateral: glosario
+# 5. Barra lateral y cabecera
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.header("📖 Glosario")
@@ -267,16 +199,12 @@ with st.sidebar:
         with st.expander(termino):
             st.write(definicion)
 
-# -----------------------------------------------------------------------------
-# 7. Cabecera y pestañas
-# -----------------------------------------------------------------------------
 st.title("🎓 EduFuture · Detectar a tiempo para acompañar mejor")
 st.caption("Modelo de regresión logística entrenado con un dataset **sintético** de 2.400 estudiantes. "
            "La predicción sirve para ofrecer apoyo preventivo, nunca para sancionar.")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "1 · El reto", "2 · Qué dicen los datos", "3 · El modelo", "4 · ¿Acierta?", "5 · Recomendaciones",
-])
+    "1 · El reto", "2 · Qué dicen los datos", "3 · El modelo", "4 · ¿Acierta?", "5 · Recomendaciones"])
 
 # ---------------------------- 1. El reto -------------------------------------
 with tab1:
@@ -294,16 +222,16 @@ with tab1:
                  "estime el **riesgo de abandono** de cada estudiante y explique **qué señales** lo provocan.")
         st.subheader("Cómo lo hemos hecho")
         st.markdown(
-            "1. **Explorar y limpiar** los datos.\n"
-            "2. **Elegir y preparar** las variables.\n"
+            "1. **Revisar** los datos.\n"
+            "2. **Explorar** qué señales hay.\n"
             "3. **Entrenar** una regresión logística.\n"
             "4. **Evaluar** si acierta con estudiantes nuevos.\n"
             "5. **Interpretar** los resultados y proponer **recomendaciones**.")
     with der:
         conteo = df[OBJETIVO].value_counts().sort_index()
         fig, ax = figura(4.5, 3.4)
-        barras = ax.bar(["Continúa", "Abandona"], conteo.values, color=[AZUL, NARANJA], width=0.6)
-        for barra, n in zip(barras, conteo.values):
+        grafico = ax.bar(["Continúa", "Abandona"], conteo.values, color=[AZUL, NARANJA], width=0.6)
+        for barra, n in zip(grafico, conteo.values):
             ax.text(barra.get_x() + barra.get_width() / 2, n + 30, f"{n} ({n / len(df):.0%})",
                     ha="center", fontweight="bold")
         ax.set_title("1 de cada 5 estudiantes abandona")
@@ -315,57 +243,41 @@ with tab1:
 
 # ---------------------------- 2. Qué dicen los datos -------------------------
 with tab2:
-    mensaje_clave("Quien abandona **falta más a clase, suspende más y está menos motivado**. "
-                  "La asistencia es la señal más clara.")
+    mensaje_clave("El abandono se dispara con **poca asistencia, acoso o repetición de curso**. "
+                  "Son señales fáciles de detectar y sobre las que se puede actuar.")
 
-    izq, der = st.columns(2)
-    with izq:
+    col1, col2, col3 = st.columns(3)
+    with col1:
         tramos = pd.cut(df["asistencia_ultimos_30_dias_pct"], [0, 75, 85, 90, 95, 100],
-                        labels=["≤ 75 %", "75–85 %", "85–90 %", "90–95 %", "95–100 %"])
-        tasa_tramo = df.groupby(tramos, observed=True)[OBJETIVO].mean() * 100
-        fig, ax = figura()
-        ax.bar(tasa_tramo.index.astype(str), tasa_tramo.values, color=NARANJA, width=0.6)
-        for i, v in enumerate(tasa_tramo.values):
-            ax.text(i, v + 1.5, f"{v:.0f}%", ha="center", fontweight="bold")
-        ax.set_title("% que abandona según su asistencia")
-        ax.set_xlabel("Asistencia en los últimos 30 días")
-        ax.set_ylabel("% que abandona")
-        ax.set_ylim(0, 80)
+                        labels=["≤75%", "75-85%", "85-90%", "90-95%", "95-100%"])
+        tasa = df.groupby(tramos, observed=True)[OBJETIVO].mean() * 100
+        fig, ax = figura(4.2, 3.4)
+        barras(ax, tasa.index.astype(str), tasa.values, "Según su asistencia")
         st.pyplot(fig)
-        st.caption("**Cómo leerlo:** con menos del 75 % de asistencia abandona el 70 %; "
-                   "con más del 95 %, solo el 3 %. Es una señal fácil de medir cada día.")
-
-    with der:
-        variable = st.selectbox("Compara a quien continúa con quien abandona en:",
-                                ["materias_suspensas_trimestre_anterior", "nota_media_trimestre_anterior_0_10",
-                                 "intencion_continuar_estudios_1_5", "satisfaccion_programa_1_5",
-                                 "dificultad_economica_hogar_1_5", "horas_estudio_semana",
-                                 "horas_trabajo_remunerado_semana"],
-                                format_func=lambda v: NOMBRES[v])
-        medias = df.groupby(OBJETIVO)[variable].mean()
-        fig, ax = figura()
-        barras = ax.bar(["Continúa", "Abandona"], medias.values, color=[AZUL, NARANJA], width=0.55)
-        for barra, v in zip(barras, medias.values):
-            ax.text(barra.get_x() + barra.get_width() / 2, v * 1.02, f"{v:.1f}", ha="center", fontweight="bold")
-        ax.set_title(f"{NOMBRES[variable]}: valor medio")
-        ax.set_ylim(0, medias.max() * 1.2)
+    with col2:
+        orden = ["Nunca", "Una vez", "Varias veces al mes", "Una vez por semana o más"]
+        tasa = df.groupby("acoso_ultimos_30_dias")[OBJETIVO].mean().reindex(orden) * 100
+        fig, ax = figura(4.2, 3.4)
+        barras(ax, ["Nunca", "Una vez", "Varias\nal mes", "Semanal"], tasa.values, "Según el acoso sufrido")
         st.pyplot(fig)
-        st.caption("**Cómo leerlo:** cuanto más diferentes son las dos barras, más útil es la variable para "
-                   "distinguir a quien abandona.")
+    with col3:
+        tasa = df.groupby("ha_repetido_curso")[OBJETIVO].mean() * 100
+        fig, ax = figura(4.2, 3.4)
+        barras(ax, ["No ha repetido", "Ha repetido"], tasa.values, "Según haber repetido curso")
+        st.pyplot(fig)
+    st.caption("**Cómo leerlo:** con menos del 75 % de asistencia abandona el 70 %; con más del 95 %, solo el 3 %. "
+               "Con acoso semanal abandona el 45 %, y quien ha repetido curso abandona más del triple que quien no.")
 
     st.subheader("Tasa de abandono por grupo")
     izq, der = st.columns([1, 2])
     with izq:
-        grupo = st.radio("Agrupar por", ["Etapa", "Curso", "Intención de continuar", "Acoso"])
-        st.caption("**Cómo leerlo:** las barras que pasan la línea gris tienen más abandono que la media (19 %). "
-                   "Fíjate en la intención de continuar: es de las señales más fuertes.")
-    columna = {"Etapa": "etapa", "Curso": "curso_nivel", "Intención de continuar": "intencion_continuar_estudios_1_5",
-               "Acoso": "acoso_ultimos_30_dias"}[grupo]
+        grupo = st.radio("Agrupar por", ["Etapa", "Curso", "Intención de continuar"])
+        st.caption("**Cómo leerlo:** las barras que pasan la línea gris tienen más abandono que la media (19 %).")
+    columna = {"Etapa": "etapa", "Curso": "curso_nivel", "Intención de continuar": "intencion_continuar_estudios_1_5"}[grupo]
     tasa = (df.groupby(columna)[OBJETIVO].mean() * 100).sort_values()
     fig, ax = figura(6.5, 0.4 * len(tasa) + 1)
     ax.barh(tasa.index.astype(str), tasa.values, color=NARANJA, height=0.6)
     ax.axvline(df[OBJETIVO].mean() * 100, color=GRIS, ls="--")
-    ax.text(df[OBJETIVO].mean() * 100 + 0.5, len(tasa) - 0.4, "media", color=GRIS, fontsize=9)
     for i, v in enumerate(tasa.values):
         ax.text(v + 0.5, i, f"{v:.1f}%", va="center", fontsize=9)
     ax.set_xlabel("% que abandona")
@@ -375,7 +287,7 @@ with tab2:
     with st.expander("✅ ¿Cómo comprobamos que los datos estaban limpios?"):
         st.markdown(
             "- **0 valores nulos** y **0 duplicados**: no hubo que rellenar ni borrar filas.\n"
-            "- Todos los valores están **dentro de los rangos** del diccionario (por ejemplo, asistencia entre 45 y 100).\n"
+            "- Todos los valores están **dentro de los rangos** esperados (por ejemplo, asistencia entre 45 y 100).\n"
             "- **Valores extremos (outliers):** menos del 3 %. Los **conservamos** porque son casos reales y "
             "precisamente pueden ser los estudiantes con más riesgo.")
 
@@ -385,18 +297,18 @@ with tab3:
                   "nos dice **qué pesa más** en ese riesgo.")
 
     st.subheader("De los datos a la predicción en 4 pasos")
-    pasos = st.columns(4)
     contenido_pasos = [
-        ("1️⃣ Elegir variables", "24 variables: asistencia, notas, situación familiar, motivación… "
-                                "Dejamos fuera sexo, origen o territorio: **no deben decidir quién recibe ayuda**."),
-        ("2️⃣ Prepararlas", "Pasamos el texto a números (*one-hot*) y ponemos todas las variables en la "
+        ("1️⃣ Elegir variables", "19 datos de cada estudiante (asistencia, notas, acoso, situación económica, "
+                                "motivación…) y su curso. Dejamos fuera sexo, origen o territorio: "
+                                "**no deben decidir quién recibe ayuda**."),
+        ("2️⃣ Prepararlas", "Pasamos el curso a números (*one-hot*) y ponemos todas las variables en la "
                           "misma escala (*StandardScaler*) para poder compararlas."),
         ("3️⃣ Entrenar", "El modelo aprende con el **70 %** de los estudiantes. Le pedimos que dé más peso a "
                        "los que abandonan (*class_weight='balanced'*), porque son minoría."),
-        ("4️⃣ Decidir", f"Si la probabilidad supera el **umbral ({umbral:.0%})**, el estudiante se marca "
-                       "como «en riesgo» y se revisa su caso."),
+        ("4️⃣ Decidir", "Si la probabilidad de abandono supera el **50 %**, el estudiante se marca "
+                       "como «en riesgo» y una persona revisa su caso."),
     ]
-    for col, (titulo, texto) in zip(pasos, contenido_pasos):
+    for col, (titulo, texto) in zip(st.columns(4), contenido_pasos):
         with col.container(border=True):
             st.markdown(f"**{titulo}**")
             st.write(texto)
@@ -404,8 +316,8 @@ with tab3:
     with st.expander("🤔 ¿Qué es una regresión logística? (explicación sencilla)"):
         st.markdown(
             "Imagina una **balanza**. Cada característica del estudiante pone un peso en un lado:\n"
-            "- Faltar a clase, suspender o tener dificultades económicas **empujan hacia el abandono**.\n"
-            "- Buena asistencia, motivación o apoyo familiar **empujan hacia la continuidad**.\n\n"
+            "- Faltar a clase, suspender, sufrir acoso o tener dificultades económicas **empujan hacia el abandono**.\n"
+            "- Buena asistencia, motivación o buena relación con el profesorado **empujan hacia la continuidad**.\n\n"
             "El modelo suma todos esos pesos y los convierte en una **probabilidad entre 0 % y 100 %**. "
             "Los pesos (coeficientes) los aprende solo, observando a 1.680 estudiantes de los que ya sabemos qué pasó.")
 
@@ -414,23 +326,24 @@ with tab3:
     with izq:
         top = resultado["coef"].head(10).iloc[::-1]
         fig, ax = figura(6.5, 4.2)
-        ax.barh(top["nombre"], top["coeficiente"], color=[NARANJA if c > 0 else AZUL for c in top["coeficiente"]])
+        ax.barh([NOMBRES[v] for v in top.index], top.values, color=[NARANJA if c > 0 else AZUL for c in top.values])
         ax.axvline(0, color=TINTA, lw=0.8)
         ax.set_title("Las 10 variables con más peso")
         ax.set_xlabel("← reduce el riesgo        aumenta el riesgo →")
         st.pyplot(fig)
     with der:
         st.markdown("🟠 **Aumentan el riesgo**")
-        st.write("Haber repetido curso, sufrir acoso, la dificultad económica y los suspensos.")
+        st.write("Sufrir acoso, haber repetido curso, la dificultad económica y los suspensos.")
         st.markdown("🔵 **Protegen**")
-        st.write("La **asistencia** (el factor nº 1), la satisfacción con lo que estudia, "
-                 "la intención de continuar y una buena relación con el profesorado.")
-        st.caption("Casi todas estas señales son **modificables**: el abandono se puede prevenir.")
+        st.write("La **asistencia** (el factor nº 1), la buena relación con el profesorado, "
+                 "la satisfacción con lo que estudia y la intención de continuar.")
+        st.caption("Casi todas estas señales son **modificables**: el abandono se puede prevenir. "
+                   "Indican **asociación, no causalidad**.")
 
 # ---------------------------- 4. ¿Acierta? -----------------------------------
 with tab4:
     mensaje_clave(f"Con **{len(resultado['y_test'])} estudiantes que el modelo nunca había visto**, "
-                  f"detecta **{vp} de cada {vp + fn}** abandonos (8 de cada 10).")
+                  f"detecta **{vp} de {vp + fn}** abandonos (casi 8 de cada 10).")
 
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Recall", f"{metricas['recall']:.0%}", help=GLOSARIO["Recall"])
@@ -455,40 +368,22 @@ with tab4:
 
     st.subheader("🧪 Experimento: ¿qué pasa si cambiamos el umbral?")
     st.write("Mueve el umbral y observa el equilibrio: **detectar más abandonos** obliga a **revisar más casos**.")
-    umbral_prueba = st.slider("Umbral de alerta", 0.20, 0.80, float(umbral), 0.05)
-    m = calcular_metricas(resultado["y_test"], resultado["prob_test"], umbral_prueba)
-    marcados = int((resultado["prob_test"] >= umbral_prueba).sum())
+    umbral = st.slider("Umbral de alerta", 0.20, 0.80, 0.50, 0.05)
+    m = calcular_metricas(resultado["y_test"], resultado["prob_test"], umbral)
+    marcados = int((resultado["prob_test"] >= umbral).sum())
+    cambia = umbral != 0.50
     c1, c2, c3 = st.columns(3)
     c1.metric("Abandonos detectados (recall)", f"{m['recall']:.0%}",
-              delta=f"{(m['recall'] - metricas['recall']) * 100:+.0f} puntos" if umbral_prueba != umbral else None)
+              delta=f"{(m['recall'] - metricas['recall']) * 100:+.0f} puntos" if cambia else None)
     c2.metric("Alertas acertadas (precision)", f"{m['precision']:.0%}",
-              delta=f"{(m['precision'] - metricas['precision']) * 100:+.0f} puntos" if umbral_prueba != umbral else None)
+              delta=f"{(m['precision'] - metricas['precision']) * 100:+.0f} puntos" if cambia else None)
     c3.metric("Estudiantes a revisar", f"{marcados} de {len(resultado['y_test'])}",
-              delta=f"{marcados - (vp + fp):+d}" if umbral_prueba != umbral else None, delta_color="inverse")
-    st.caption(f"Nuestro umbral es **{umbral:.2f}**: se eligió con el conjunto de validación para detectar "
-               "al menos el 85 % de los abandonos sin saturar al equipo de tutoría.")
+              delta=f"{marcados - (vp + fp):+d}" if cambia else None, delta_color="inverse")
+    st.caption("Nuestro modelo usa el umbral estándar del **50 %**.")
 
-    st.subheader("⚖️ ¿Es justo con todos los grupos?")
-    izq, der = st.columns([1.4, 1])
-    with izq:
-        eq = resultado["equidad"].iloc[::-1]
-        fig, ax = figura(6, 3.6)
-        ax.barh(eq["grupo"], eq["recall"], color=AZUL, height=0.6)
-        ax.axvline(metricas["recall"], color=NARANJA, ls="--")
-        ax.text(metricas["recall"], len(eq) - 0.3, f"global {metricas['recall']:.0%}", color=NARANJA,
-                ha="center", fontsize=9, fontweight="bold")
-        for i, v in enumerate(eq["recall"]):
-            ax.text(v + 0.01, i, f"{v:.0%}", va="center", fontsize=9)
-        ax.set_xlim(0, 1.1)
-        ax.set_ylim(-0.6, len(eq) + 0.1)
-        ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.0%}"))
-        ax.set_xlabel("Recall: % de abandonos detectados en cada grupo")
-        st.pyplot(fig)
-    with der:
-        st.write("El modelo **no usa** sexo, origen, necesidad de apoyo ni tipo de centro. Aun así comprobamos "
-                 "si falla más con algún grupo.")
-        st.warning("**Hallazgo:** detecta menos abandonos en **chicos** que en **chicas**. "
-                   "Antes de usarlo de verdad habría que investigar por qué.")
+    st.warning("**Limitaciones:** datos sintéticos, un solo modelo y sin auditoría de equidad. "
+               "Antes de usarlo con datos reales habría que reentrenarlo y comprobar que detecta igual de bien "
+               "a todos los grupos de estudiantes.")
 
 # ---------------------------- 5. Recomendaciones -----------------------------
 with tab5:
@@ -496,15 +391,14 @@ with tab5:
                   "estas acciones dicen **cómo**.")
     acciones = [
         ("📅 Alerta de asistencia", "Revisión mensual si baja del 85 % o hay retrasos frecuentes. Contacto con la familia."),
-        ("📚 Refuerzo académico", "Plan de recuperación quincenal con 2 o más suspensos o repetición de curso."),
-        ("🧭 Orientación vocacional", "Revisar si el itinerario encaja cuando la satisfacción o la intención de continuar son bajas."),
-        ("💶 Apoyo socioeconómico", "Becas, flexibilidad horaria y conciliación para quien trabaja o cuida de familiares."),
+        ("📚 Refuerzo académico", "Plan de recuperación con 2 o más suspensos o repetición de curso."),
         ("🛡️ Convivencia y bienestar", "Protocolo antiacoso, apoyo psicoeducativo y mentoría entre iguales."),
+        ("💶 Apoyo socioeconómico", "Becas, flexibilidad horaria y conciliación para quien trabaja o cuida de familiares."),
+        ("🧭 Orientación vocacional", "Revisar si el itinerario encaja cuando la satisfacción o la intención de continuar son bajas."),
         ("🔁 Uso del modelo", "Ejecutarlo cada trimestre y medir si las intervenciones reducen el abandono."),
     ]
     for fila in range(2):
-        columnas = st.columns(3)
-        for col, (titulo, texto) in zip(columnas, acciones[fila * 3:(fila + 1) * 3]):
+        for col, (titulo, texto) in zip(st.columns(3), acciones[fila * 3:(fila + 1) * 3]):
             with col.container(border=True):
                 st.markdown(f"**{titulo}**")
                 st.write(texto)
