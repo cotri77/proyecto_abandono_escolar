@@ -155,8 +155,8 @@ def grafico_matriz(matriz):
     vn, fp, fn, vp = matriz.ravel()
     fig, ax = figura(4.6, 3.6)
     colores = [[AZUL, AMARILLO], [ROJO, VERDE]]
-    textos = [[f"{vn}\nContinúa y no se marca", f"{fp}\nFalsa alarma"],
-              [f"{fn}\nAbandono NO detectado", f"{vp}\nAbandono detectado"]]
+    textos = [[f"{vn}\nContinúa,\nsin alerta", f"{fp}\nFalsa\nalarma"],
+              [f"{fn}\nAbandono\nNO detectado", f"{vp}\nAbandono\ndetectado"]]
     for fila in range(2):
         for col in range(2):
             ax.add_patch(plt.Rectangle((col, 1 - fila), 0.97, 0.97, color=colores[fila][col]))
