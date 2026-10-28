@@ -12,6 +12,7 @@ estudios en los 12 meses siguientes, para que EduFuture pueda ofrecer **apoyo pr
 ├── app.py                               # Aplicación Streamlit
 ├── data/                                # Dataset (Excel)
 ├── presentacion/                        # Presentación final (PowerPoint)
+├── GUIA_EXPOSICION.md                   # Guion, glosario y preguntas para la exposición
 ├── requirements.txt
 └── README.md
 ```
@@ -52,7 +53,7 @@ python -m venv .venv
 pip install -r requirements.txt
 streamlit run app.py
 ```
-Se abre en `http://localhost:8501` con cuatro pestañas: exploración, modelo, predicción individual y uso responsable.
+Abre `http://localhost:8501` en el navegador **mientras la app está en marcha** (la primera carga tarda unos 20 segundos). La app cuenta el proyecto en 6 pestañas: el reto, los datos, el modelo, ¿acierta?, probar con un estudiante y recomendaciones.
 
 ## ⚖️ Uso responsable
 La predicción activa una **revisión humana y una oferta de apoyo**, nunca una sanción o exclusión.

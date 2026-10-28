@@ -1,0 +1,7 @@
+# Tema claro con los colores de la presentación
+[theme]
+base = "light"
+primaryColor = "#DD8452"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F1F4F8"
+textColor = "#1B2A41"
