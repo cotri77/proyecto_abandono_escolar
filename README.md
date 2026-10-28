@@ -12,6 +12,7 @@ estudios en los 12 meses siguientes, para que EduFuture pueda ofrecer **apoyo pr
 ├── app.py                               # Aplicación Streamlit
 ├── data/                                # Dataset (Excel)
 ├── presentacion/                        # Presentación final (PowerPoint)
+├── docs/                                # Guía de aprendizaje: plantilla de proyecto de clasificación (Word)
 ├── GUIA_EXPOSICION.md                   # Guion, glosario y preguntas para la exposición
 ├── requirements.txt
 └── README.md
