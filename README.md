@@ -53,7 +53,7 @@ python -m venv .venv
 pip install -r requirements.txt
 streamlit run app.py
 ```
-Abre `http://localhost:8501` en el navegador **mientras la app está en marcha** (la primera carga tarda unos 20 segundos). La app cuenta el proyecto en 6 pestañas: el reto, los datos, el modelo, ¿acierta?, probar con un estudiante y recomendaciones.
+Abre `http://localhost:8501` en el navegador **mientras la app está en marcha** (la primera carga tarda unos 20 segundos). La app cuenta el proyecto en 5 pestañas: el reto, los datos, el modelo, ¿acierta? y recomendaciones.
 
 ## ⚖️ Uso responsable
 La predicción activa una **revisión humana y una oferta de apoyo**, nunca una sanción o exclusión.

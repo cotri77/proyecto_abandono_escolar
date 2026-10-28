@@ -78,15 +78,12 @@ Si te pierdes durante la exposición, vuelve a esta frase.
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-1. **Pestaña 1 · El reto:** «La app cuenta la historia en 6 pasos».
-2. **Pestaña 5 · Probar con un estudiante:**
-   - Pulsa **🟢 Sin señales de riesgo** → «Riesgo bajo: la flecha está en verde».
-   - Pulsa **🔴 Riesgo alto** → «La flecha pasa a rojo y la app explica **por qué**: asistencia,
-     suspensos, dificultad económica… y propone **qué apoyo** dar en cada caso».
-   - Mueve el control de **asistencia** hacia arriba y enseña cómo baja el riesgo en directo.
-3. **Pestaña 4 · ¿Acierta?** (si hay tiempo): mueve el **umbral** a 0,35 → «Detectamos más abandonos,
-   pero hay que revisar a más estudiantes. Es un equilibrio».
-4. **Cierre:** «El modelo dice **a quién** ayudar; la pestaña 6 dice **cómo**».
+1. **Pestaña 1 · El reto:** «La app cuenta la historia en 5 pasos».
+2. **Pestaña 2 · Qué dicen los datos:** señala el gráfico de asistencia → «Con menos del 75 % de
+   asistencia abandona el 70 %; con más del 95 %, solo el 3 %».
+3. **Pestaña 4 · ¿Acierta?:** mueve el **umbral** de 0,50 a 0,35 → «Detectamos más abandonos,
+   pero hay que revisar a más estudiantes. Es un equilibrio». Vuelve a dejarlo en 0,50.
+4. **Cierre:** «El modelo dice **a quién** ayudar; la pestaña 5 dice **cómo**».
 
 **El glosario** está en la barra lateral izquierda de la app, por si alguien pregunta un término.
 
@@ -114,10 +111,6 @@ son valores posibles y suelen ser los estudiantes con más riesgo.
 **¿Por qué no usáis el sexo o el origen si pueden influir?**
 Porque son datos sensibles y no deben decidir quién recibe ayuda. Los usamos solo para **auditar** que el
 modelo no falla más con un grupo que con otro.
-
-**¿Por qué un estudiante muy mal en todo solo tiene un 61 % (o un 100 %) de riesgo?**
-Al equilibrar las clases, la probabilidad funciona como una **puntuación de riesgo**: sirve para ordenar
-a los estudiantes y compararla con el umbral, no como un porcentaje exacto.
 
 **¿Hay sobreajuste?**
 No. El AUC es casi igual en entrenamiento (0,91), validación (0,92) y prueba (0,91).

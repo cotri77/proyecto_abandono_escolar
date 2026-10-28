@@ -3,9 +3,8 @@
 #
 # Ejecutar en local:   streamlit run app.py
 #
-# La app cuenta el proyecto como una historia en 6 pasos (una pestaña por paso):
-#   1. El reto  ->  2. Qué dicen los datos  ->  3. El modelo  ->  4. ¿Acierta?
-#   5. Probar con un estudiante  ->  6. Recomendaciones
+# La app cuenta el proyecto como una historia en 5 pasos (una pestaña por paso):
+#   1. El reto  ->  2. Qué dicen los datos  ->  3. El modelo  ->  4. ¿Acierta?  ->  5. Recomendaciones
 #
 # Reproduce las mismas decisiones que el notebook:
 #   - mismas variables y misma ingeniería de características
@@ -90,50 +89,6 @@ NOMBRES = {
     "bienestar_autopercibido_1_5": "Bienestar",
     "apoyo_familiar_estudios_1_5": "Apoyo familiar",
     "intencion_continuar_estudios_1_5": "Intención de continuar",
-}
-
-# Recomendación asociada a cada señal de riesgo (según la guía del dataset)
-RECOMENDACIONES = {
-    "asistencia_ultimos_30_dias_pct": "Tutoría individual y contacto temprano con la familia; revisar barreras de transporte, horarios o cuidados.",
-    "retrasos_ultimos_30_dias": "Revisar puntualidad y organización; posibles barreras de transporte u horario.",
-    "materias_suspensas_trimestre_anterior": "Refuerzo académico y plan de recuperación con seguimiento quincenal.",
-    "nota_media_trimestre_anterior_0_10": "Refuerzo académico y plan de recuperación con seguimiento quincenal.",
-    "ha_repetido_curso": "Seguimiento académico cercano y plan de recuperación personalizado.",
-    "horas_estudio_semana": "Taller de hábitos y técnicas de estudio; espacio de estudio guiado en el centro.",
-    "edad_anios": "Orientación sobre itinerarios adaptados a su edad y situación.",
-    "segundo_curso": "Acompañamiento en el tramo final del ciclo y orientación sobre el siguiente paso.",
-    "dificultad_economica_hogar_1_5": "Información sobre becas y ayudas; derivación a recursos sociales.",
-    "internet_estable_hogar": "Préstamo de dispositivos o conectividad; acceso a aulas con internet.",
-    "espacio_adecuado_estudio": "Ofrecer biblioteca o aula de estudio en horario ampliado.",
-    "horas_trabajo_remunerado_semana": "Flexibilidad horaria y orientación para compatibilizar trabajo y estudio.",
-    "horas_cuidados_familiares_semana": "Apoyo de conciliación y derivación a servicios sociales.",
-    "satisfaccion_programa_1_5": "Orientación académica: revisar el encaje del itinerario o la especialidad.",
-    "utilidad_percibida_estudios_1_5": "Orientación vocacional: conectar los estudios con salidas profesionales.",
-    "pertenencia_centro_1_5": "Plan de integración: mentoría entre iguales y actividades del centro.",
-    "relacion_docentes_1_5": "Asignar un tutor/a de referencia y mejorar la comunicación con el profesorado.",
-    "acoso_frecuencia_0_3": "Activar el protocolo de convivencia y apoyo psicoeducativo.",
-    "bienestar_autopercibido_1_5": "Apoyo psicoeducativo y derivación a orientación.",
-    "apoyo_familiar_estudios_1_5": "Implicar a la familia: reuniones de orientación sobre la continuidad.",
-    "intencion_continuar_estudios_1_5": "Entrevista de orientación sobre su proyecto académico y profesional.",
-}
-
-# Perfiles de ejemplo para la demo (botones de la pestaña 5)
-PERFILES = {
-    "🟢 Sin señales de riesgo": dict(
-        curso="1º Bachillerato", edad=16, asistencia=97.0, retrasos=0, suspensos=0, nota=7.8, repetido="No",
-        estudio=12, entorno="Urbano", estudios_prog="Educación superior", dificultad=1, internet="Sí",
-        espacio="Sí", trabajo=0, cuidados=0, satisfaccion=4, utilidad=4, pertenencia=4, relacion=4,
-        bienestar=4, apoyo=5, intencion=5, acoso="Nunca"),
-    "🟠 Algunas señales": dict(
-        curso="1º CFGM", edad=17, asistencia=84.0, retrasos=3, suspensos=2, nota=5.8, repetido="No",
-        estudio=6, entorno="Intermedio", estudios_prog="ESO o equivalente", dificultad=3, internet="Sí",
-        espacio="Sí", trabajo=6, cuidados=3, satisfaccion=3, utilidad=3, pertenencia=3, relacion=3,
-        bienestar=3, apoyo=3, intencion=3, acoso="Una vez"),
-    "🔴 Riesgo alto": dict(
-        curso="2º CFGM", edad=19, asistencia=68.0, retrasos=7, suspensos=5, nota=4.3, repetido="Sí",
-        estudio=3, entorno="Urbano", estudios_prog="Primaria o inferior", dificultad=5, internet="No",
-        espacio="No", trabajo=12, cuidados=10, satisfaccion=2, utilidad=2, pertenencia=2, relacion=2,
-        bienestar=2, apoyo=2, intencion=1, acoso="Varias veces al mes"),
 }
 
 # Glosario para la barra lateral
@@ -286,24 +241,6 @@ def grafico_matriz(matriz):
     return fig
 
 
-def grafico_riesgo(probabilidad, umbral):
-    """Barra de riesgo con tres zonas (bajo, medio, alto) y una flecha en la probabilidad."""
-    fig, ax = figura(4.5, 1.6)
-    ax.barh(0, umbral * 0.6, color=VERDE, height=0.6)
-    ax.barh(0, umbral * 0.4, left=umbral * 0.6, color=AMARILLO, height=0.6)
-    ax.barh(0, 1 - umbral, left=umbral, color=ROJO, height=0.6)
-    ax.annotate("", xy=(probabilidad, 0.32), xytext=(probabilidad, 0.8),
-                arrowprops=dict(arrowstyle="-|>", color=TINTA, lw=2.5))
-    ax.text(probabilidad, 0.88, f"{probabilidad:.0%}", ha="center", fontsize=16, fontweight="bold", color=TINTA)
-    for x, texto in [(umbral * 0.3, "Bajo"), (umbral * 0.8, "Medio"), ((1 + umbral) / 2, "Alto")]:
-        ax.text(x, 0, texto, ha="center", va="center", color="white" if texto != "Medio" else TINTA,
-                fontweight="bold", fontsize=11)
-    ax.set_xlim(0, 1)
-    ax.set_ylim(-0.4, 1.2)
-    ax.axis("off")
-    return fig
-
-
 # -----------------------------------------------------------------------------
 # 5. Carga de datos y modelo
 # -----------------------------------------------------------------------------
@@ -337,9 +274,8 @@ st.title("🎓 EduFuture · Detectar a tiempo para acompañar mejor")
 st.caption("Modelo de regresión logística entrenado con un dataset **sintético** de 2.400 estudiantes. "
            "La predicción sirve para ofrecer apoyo preventivo, nunca para sancionar.")
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "1 · El reto", "2 · Qué dicen los datos", "3 · El modelo",
-    "4 · ¿Acierta?", "5 · Probar con un estudiante", "6 · Recomendaciones",
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "1 · El reto", "2 · Qué dicen los datos", "3 · El modelo", "4 · ¿Acierta?", "5 · Recomendaciones",
 ])
 
 # ---------------------------- 1. El reto -------------------------------------
@@ -554,116 +490,8 @@ with tab4:
         st.warning("**Hallazgo:** detecta menos abandonos en **chicos** que en **chicas**. "
                    "Antes de usarlo de verdad habría que investigar por qué.")
 
-# ---------------------------- 5. Probar con un estudiante --------------------
-def cargar_perfil(nombre):
-    """Rellena el formulario con uno de los perfiles de ejemplo."""
-    for clave, valor in PERFILES[nombre].items():
-        st.session_state[clave] = valor
-
-
-# Valores iniciales del formulario: el perfil intermedio
-if "curso" not in st.session_state:
-    cargar_perfil("🟠 Algunas señales")
-
+# ---------------------------- 5. Recomendaciones -----------------------------
 with tab5:
-    mensaje_clave("Introduce los datos de un estudiante y el modelo estima su riesgo, explica **por qué** "
-                  "y sugiere **qué apoyo** ofrecerle.")
-
-    st.write("**Carga un ejemplo** o cambia los valores a mano (el resultado se actualiza al momento):")
-    botones = st.columns(len(PERFILES))
-    for boton, nombre in zip(botones, PERFILES):
-        boton.button(nombre, on_click=cargar_perfil, args=(nombre,), width="stretch")
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown("**🏫 Situación académica**")
-        cursos = df.groupby("curso_nivel")["etapa"].first()
-        st.selectbox("Curso", list(cursos.index), key="curso")
-        st.slider("Asistencia últimos 30 días (%)", 45.0, 100.0, step=0.5, key="asistencia")
-        st.slider("Materias suspensas", 0, 8, key="suspensos")
-        st.slider("Nota media", 2.5, 10.0, step=0.1, key="nota")
-        st.radio("¿Ha repetido curso?", ["No", "Sí"], horizontal=True, key="repetido")
-    with c2:
-        st.markdown("**💬 Motivación y bienestar** (1 = muy bajo · 5 = muy alto)")
-        st.slider("Intención de continuar estudios", 1, 5, key="intencion")
-        st.slider("Satisfacción con el programa", 1, 5, key="satisfaccion")
-        st.slider("Relación con docentes", 1, 5, key="relacion")
-        st.selectbox("Acoso últimos 30 días", list(ORDEN_ACOSO.keys()), key="acoso")
-    with c3:
-        st.markdown("**🏠 Contexto familiar**")
-        st.slider("Dificultad económica (1 = ninguna · 5 = muy alta)", 1, 5, key="dificultad")
-        st.slider("Horas de trabajo remunerado/semana", 0, 24, key="trabajo")
-        st.slider("Horas de cuidados familiares/semana", 0, 25, key="cuidados")
-
-    with st.expander("Más datos del estudiante (opcionales)"):
-        e1, e2, e3 = st.columns(3)
-        with e1:
-            st.slider("Edad", 15, 21, key="edad")
-            st.slider("Retrasos últimos 30 días", 0, 18, key="retrasos")
-            st.slider("Horas de estudio/semana", 0, 30, key="estudio")
-        with e2:
-            st.selectbox("Entorno del municipio", sorted(df["entorno_municipio"].unique()), key="entorno")
-            st.selectbox("Estudios máximos de progenitores", sorted(df["max_estudios_progenitores"].unique()),
-                         key="estudios_prog")
-            st.radio("¿Internet estable en casa?", ["Sí", "No"], horizontal=True, key="internet")
-            st.radio("¿Espacio adecuado para estudiar?", ["Sí", "No"], horizontal=True, key="espacio")
-        with e3:
-            st.slider("Utilidad percibida de los estudios", 1, 5, key="utilidad")
-            st.slider("Pertenencia al centro", 1, 5, key="pertenencia")
-            st.slider("Bienestar autopercibido", 1, 5, key="bienestar")
-            st.slider("Apoyo familiar", 1, 5, key="apoyo")
-
-    # Construimos una fila con los datos introducidos, igual que las del dataset
-    v = st.session_state
-    estudiante = pd.DataFrame([{
-        "curso_nivel": v.curso, "etapa": cursos[v.curso], "entorno_municipio": v.entorno,
-        "max_estudios_progenitores": v.estudios_prog, "edad_anios": v.edad,
-        "asistencia_ultimos_30_dias_pct": v.asistencia, "retrasos_ultimos_30_dias": v.retrasos,
-        "materias_suspensas_trimestre_anterior": v.suspensos, "nota_media_trimestre_anterior_0_10": v.nota,
-        "ha_repetido_curso": int(v.repetido == "Sí"), "horas_estudio_semana": v.estudio,
-        "dificultad_economica_hogar_1_5": v.dificultad, "internet_estable_hogar": int(v.internet == "Sí"),
-        "espacio_adecuado_estudio": int(v.espacio == "Sí"), "horas_trabajo_remunerado_semana": v.trabajo,
-        "horas_cuidados_familiares_semana": v.cuidados, "satisfaccion_programa_1_5": v.satisfaccion,
-        "utilidad_percibida_estudios_1_5": v.utilidad, "pertenencia_centro_1_5": v.pertenencia,
-        "relacion_docentes_1_5": v.relacion, "bienestar_autopercibido_1_5": v.bienestar,
-        "apoyo_familiar_estudios_1_5": v.apoyo, "intencion_continuar_estudios_1_5": v.intencion,
-        "acoso_ultimos_30_dias": v.acoso,
-    }])
-    estudiante = preparar_variables(estudiante)
-    probabilidad = modelo.predict_proba(estudiante[PREDICTORAS])[0, 1]
-
-    st.divider()
-    izq, der = st.columns([1, 1.2])
-    with izq:
-        st.subheader("Resultado")
-        st.pyplot(grafico_riesgo(probabilidad, umbral))
-        if probabilidad >= umbral:
-            st.error(f"🔴 **Riesgo ALTO.** Supera el umbral de alerta ({umbral:.0%}): conviene revisar su caso.")
-        elif probabilidad >= umbral * 0.6:
-            st.warning("🟠 **Riesgo MEDIO.** No salta la alerta, pero merece seguimiento.")
-        else:
-            st.success("🟢 **Riesgo BAJO.** No hay señales de alerta destacables.")
-        st.caption("La probabilidad funciona como una **puntuación de riesgo**: sirve para comparar estudiantes "
-                   "y decidir a quién revisar primero.")
-
-    # Contribución de cada variable = coeficiente x valor estandarizado.
-    # Valores positivos empujan la predicción hacia el abandono.
-    escalador = modelo.named_steps["preprocesado"].named_transformers_["num"]
-    valores_z = (estudiante[VARIABLES_NUMERICAS].values[0] - escalador.mean_) / escalador.scale_
-    coef_num = modelo.named_steps["regresion"].coef_[0][:len(VARIABLES_NUMERICAS)]
-    contribuciones = pd.Series(coef_num * valores_z, index=VARIABLES_NUMERICAS).sort_values(ascending=False)
-    senales = contribuciones[contribuciones > 0.05].head(4)
-
-    with der:
-        st.subheader("¿Por qué? Señales y apoyo sugerido")
-        if senales.empty:
-            st.write("Ninguna variable eleva su riesgo por encima de lo normal. 👍")
-        for var in senales.index:
-            st.markdown(f"**{NOMBRES[var]}** (valor: {estudiante[var].iloc[0]:g})  \n➡️ {RECOMENDACIONES[var]}")
-    st.caption("⚠️ La predicción activa una **revisión humana** y una oferta de apoyo, nunca una decisión automática.")
-
-# ---------------------------- 6. Recomendaciones -----------------------------
-with tab6:
     mensaje_clave("Cada factor de riesgo tiene una respuesta concreta. El modelo dice **a quién** ayudar; "
                   "estas acciones dicen **cómo**.")
     acciones = [
@@ -686,7 +514,7 @@ with tab6:
     with izq:
         st.markdown("**✅ Lo que hace el modelo**\n"
                     "- Ordena a los estudiantes por riesgo para **priorizar** la ayuda.\n"
-                    "- Explica qué señales elevan el riesgo de cada uno.\n"
+                    "- Explica qué factores elevan el riesgo.\n"
                     "- Cada alerta la **revisa una persona** del equipo de tutoría.")
     with der:
         st.markdown("**❌ Lo que NO hace**\n"
