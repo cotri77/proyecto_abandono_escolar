@@ -125,10 +125,12 @@ la diferencia entre chicos y chicas y mantener siempre la revisión humana.
 
 | Bloque | Celdas | Qué hace |
 |---|---|---|
-| Preparación | 1–3 | Librerías, carga del Excel y diccionario de variables |
-| Limpieza | 4–9 | Nulos, duplicados, rangos, binarias y categorías |
-| Exploración | 10–15 | Gráficos del abandono y outliers |
-| Variables | 16–19 | Selección, nuevas variables, división de datos y `Pipeline` |
-| Modelo | 20–23 | Comparación de versiones y elección del umbral |
-| Evaluación | 24–26 | Métricas, matriz de confusión y curva ROC |
-| Interpretación | 27–32 | Coeficientes, equidad y resumen final |
+| Preparación | 1–2 | Librerías y subida del Excel |
+| Revisión de datos | 3–4 | Nulos, duplicados, rangos y valores extremos |
+| Exploración | 5–6 | Abandono total y por etapa; asistencia, acoso y repetir curso |
+| Variables y datos | 7–8 | Variables del modelo y división entrenamiento / prueba |
+| Modelo | 9 | `Pipeline` (escalado + one-hot + regresión logística) y entrenamiento |
+| Evaluación | 10–11 | Métricas y matriz de confusión |
+| Interpretación | 12 | Coeficientes: qué factores pesan más |
+
+El notebook usa solo entrenamiento y prueba, un único modelo y el umbral estándar del 50 %.
